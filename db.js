@@ -1,13 +1,15 @@
 import mongoose from "mongoose";
-import { log } from "./vite.js";
 
 let hasWarnedAboutMemory = false;
 
 export async function connectMongo() {
   const uri = process.env.MONGODB_URI;
+
   if (!uri) {
     if (!hasWarnedAboutMemory) {
-      log("MONGODB_URI not set. Falling back to in-memory storage.", "db");
+      console.log(
+        "MONGODB_URI not set. Falling back to in-memory storage."
+      );
       hasWarnedAboutMemory = true;
     }
     return false;
@@ -21,6 +23,6 @@ export async function connectMongo() {
     dbName: process.env.MONGODB_DB || undefined,
   });
 
-  log("Connected to MongoDB", "db");
+  console.log("Connected to MongoDB");
   return true;
 }
