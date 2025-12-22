@@ -5,110 +5,102 @@ import { Task } from "./models/Task.js";
 import { Note } from "./models/Note.js";
 import { Journal } from "./models/Journal.js";
 
-const hasStructuredClone =
-  typeof globalThis !== "undefined" && typeof globalThis.structuredClone === "function";
-
-const clone = (value) => {
-  if (value === undefined || value === null) return value;
-  if (hasStructuredClone) {
-    return globalThis.structuredClone(value);
-  }
-  return JSON.parse(JSON.stringify(value));
-};
+/* ================= MONGO STORAGE ================= */
 
 class MongoStorage {
   async getUser(id) {
     if (!mongoose.isValidObjectId(id)) return undefined;
-    return await User.findById(id).lean();
+    return await User.findById(id);
   }
 
   async getUserByUsername(username) {
-    return await User.findOne({ username }).lean();
+    return await User.findOne({ username });
   }
 
   async getUserByEmail(email) {
-    return await User.findOne({ email }).lean();
+    return await User.findOne({ email });
   }
 
   async createUser(insertUser) {
-    const doc = await User.create(insertUser);
-    return doc.toObject();
+    return await User.create(insertUser);
   }
 
+  /* -------- TASKS -------- */
+
   async getTasks(userId) {
-    return await Task.find({ userId }).sort({ createdAt: -1 }).lean();
+    return await Task.find({ userId }).sort({ createdAt: -1 });
   }
 
   async getTask(id) {
     if (!mongoose.isValidObjectId(id)) return undefined;
-    return await Task.findById(id).lean();
+    return await Task.findById(id);
   }
 
   async createTask(insertTask) {
-    const doc = await Task.create(insertTask);
-    return doc.toObject();
+    return await Task.create(insertTask);
   }
 
   async updateTask(id, updates) {
     if (!mongoose.isValidObjectId(id)) return undefined;
-    return await Task.findByIdAndUpdate(id, updates, { new: true }).lean();
+    return await Task.findByIdAndUpdate(id, updates, { new: true });
   }
 
   async deleteTask(id) {
     if (!mongoose.isValidObjectId(id)) return false;
-    const res = await Task.findByIdAndDelete(id);
-    return !!res;
+    return !!(await Task.findByIdAndDelete(id));
   }
 
+  /* -------- NOTES -------- */
+
   async getNotes(userId) {
-    return await Note.find({ userId }).sort({ updatedAt: -1 }).lean();
+    return await Note.find({ userId }).sort({ updatedAt: -1 });
   }
 
   async getNote(id) {
     if (!mongoose.isValidObjectId(id)) return undefined;
-    return await Note.findById(id).lean();
+    return await Note.findById(id);
   }
 
   async createNote(insertNote) {
-    const doc = await Note.create(insertNote);
-    return doc.toObject();
+    return await Note.create(insertNote);
   }
 
   async updateNote(id, updates) {
     if (!mongoose.isValidObjectId(id)) return undefined;
     return await Note.findByIdAndUpdate(
       id,
-      { ...updates, $set: { updatedAt: new Date() } },
-      { new: true },
-    ).lean();
+      { ...updates, updatedAt: new Date() },
+      { new: true }
+    );
   }
 
   async deleteNote(id) {
     if (!mongoose.isValidObjectId(id)) return false;
-    const res = await Note.findByIdAndDelete(id);
-    return !!res;
+    return !!(await Note.findByIdAndDelete(id));
   }
 
+  /* -------- JOURNALS -------- */
+
   async getJournals(userId) {
-    return await Journal.find({ userId }).sort({ date: -1 }).lean();
+    return await Journal.find({ userId }).sort({ date: -1 });
   }
 
   async getJournal(id) {
     if (!mongoose.isValidObjectId(id)) return undefined;
-    return await Journal.findById(id).lean();
+    return await Journal.findById(id);
   }
 
   async createJournal(insertJournal) {
-    const doc = await Journal.create(insertJournal);
-    return doc.toObject();
+    return await Journal.create(insertJournal);
   }
 
   async deleteJournal(id) {
     if (!mongoose.isValidObjectId(id)) return false;
-    const res = await Journal.findByIdAndDelete(id);
-    return !!res;
+    return !!(await Journal.findByIdAndDelete(id));
   }
 }
+
+/* ================= MEMORY STORAGE (UNCHANGED) ================= */
 
 class MemoryStorage {
   constructor() {
@@ -121,66 +113,44 @@ class MemoryStorage {
   }
 
   async getUser(id) {
-    return clone(this.users.get(id));
+    return this.users.get(id);
   }
 
   async getUserByUsername(username) {
-    return clone(this.usersByUsername.get(username));
+    return this.usersByUsername.get(username);
   }
 
   async getUserByEmail(email) {
-    return clone(this.usersByEmail.get(email));
+    return this.usersByEmail.get(email);
   }
 
   async createUser(insertUser) {
-    const user = {
-      id: randomUUID(),
-      createdAt: new Date(),
-      ...insertUser,
-    };
+    const user = { id: randomUUID(), ...insertUser };
     this.users.set(user.id, user);
     this.usersByUsername.set(user.username, user);
     this.usersByEmail.set(user.email, user);
-    return clone(user);
+    return user;
   }
 
   async getTasks(userId) {
-    const tasks = Array.from(this.tasks.values())
-      .filter((task) => task.userId === userId)
-      .sort((a, b) => b.createdAt - a.createdAt);
-    return tasks.map(clone);
+    return [...this.tasks.values()].filter(t => t.userId === userId);
   }
 
   async getTask(id) {
-    return clone(this.tasks.get(id));
+    return this.tasks.get(id);
   }
 
-  async createTask(insertTask) {
-    const task = {
-      id: randomUUID(),
-      createdAt: new Date(),
-      ...insertTask,
-    };
-    if (task.dueDate) {
-      task.dueDate = new Date(task.dueDate);
-    } else {
-      task.dueDate = null;
-    }
-    task.completed = Boolean(task.completed);
-    task.priority = task.priority || "medium";
-    task.description = task.description ?? null;
-    this.tasks.set(task.id, task);
-    return clone(task);
+  async createTask(task) {
+    const t = { id: randomUUID(), createdAt: new Date(), ...task };
+    this.tasks.set(t.id, t);
+    return t;
   }
 
   async updateTask(id, updates) {
-    const task = this.tasks.get(id);
-    if (!task) return undefined;
-    if (updates.dueDate !== undefined) {
-      updates.dueDate = updates.dueDate ? new Date(updates.dueDate) : null;
-    }
-    Object.assign(task, updates);
-    return clone(task);
+    const t = this.tasks.get(id);
+    if (!t) return undefined;
+    Object.assign(t, updates);
+    return t;
   }
 
   async deleteTask(id) {
@@ -188,35 +158,24 @@ class MemoryStorage {
   }
 
   async getNotes(userId) {
-    const notes = Array.from(this.notes.values())
-      .filter((note) => note.userId === userId)
-      .sort((a, b) => b.updatedAt - a.updatedAt);
-    return notes.map(clone);
+    return [...this.notes.values()].filter(n => n.userId === userId);
   }
 
   async getNote(id) {
-    return clone(this.notes.get(id));
+    return this.notes.get(id);
   }
 
-  async createNote(insertNote) {
-    const now = new Date();
-    const note = {
-      id: randomUUID(),
-      createdAt: now,
-      updatedAt: now,
-      ...insertNote,
-    };
-    this.notes.set(note.id, note);
-    return clone(note);
+  async createNote(note) {
+    const n = { id: randomUUID(), createdAt: new Date(), updatedAt: new Date(), ...note };
+    this.notes.set(n.id, n);
+    return n;
   }
 
   async updateNote(id, updates) {
-    const note = this.notes.get(id);
-    if (!note) return undefined;
-    Object.assign(note, updates);
-    note.updatedAt = new Date();
-    this.notes.set(id, note);
-    return clone(note);
+    const n = this.notes.get(id);
+    if (!n) return undefined;
+    Object.assign(n, updates, { updatedAt: new Date() });
+    return n;
   }
 
   async deleteNote(id) {
@@ -224,32 +183,25 @@ class MemoryStorage {
   }
 
   async getJournals(userId) {
-    const journals = Array.from(this.journals.values())
-      .filter((journal) => journal.userId === userId)
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
-    return journals.map(clone);
+    return [...this.journals.values()].filter(j => j.userId === userId);
   }
 
   async getJournal(id) {
-    return clone(this.journals.get(id));
+    return this.journals.get(id);
   }
 
-  async createJournal(insertJournal) {
-    const journal = {
-      id: randomUUID(),
-      createdAt: new Date(),
-      ...insertJournal,
-    };
-    journal.date = journal.date ? new Date(journal.date) : new Date();
-    journal.activities = journal.activities ?? null;
-    this.journals.set(journal.id, journal);
-    return clone(journal);
+  async createJournal(journal) {
+    const j = { id: randomUUID(), ...journal };
+    this.journals.set(j.id, j);
+    return j;
   }
 
   async deleteJournal(id) {
     return this.journals.delete(id);
   }
 }
+
+/* ================= EXPORT ================= */
 
 const useMongoStorage = Boolean(process.env.MONGODB_URI);
 export const storage = useMongoStorage ? new MongoStorage() : new MemoryStorage();
