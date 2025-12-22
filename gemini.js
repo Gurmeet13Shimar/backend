@@ -1,4 +1,7 @@
+import dotenv from "dotenv";
+dotenv.config();
 import { GoogleGenerativeAI } from "@google/generative-ai";
+
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -17,4 +20,8 @@ export async function summarizeStudentNotes(noteContent) {
 
   return result.response.text();
 }
+summarizeStudentNotes("Gemini test")
+  .then(console.log)
+  .catch(console.error);
+
 console.log("GEMINI KEY LOADED:", !!process.env.GEMINI_API_KEY);
