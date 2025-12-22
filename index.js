@@ -8,29 +8,40 @@ dotenv.config();
 
 const app = express();
 
-/* CORS*/
+/* -------------------- MIDDLEWARE -------------------- */
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+/* -------------------- CORS -------------------- */
 app.use(
   cors({
     origin: [
-      "https://sayeasefrontend-x9vv.vercel.app",
+      "http://localhost:5173",
       "https://sayeasefrontend.vercel.app",
+      "https://sayeasefrontend-x9vv.vercel.app",
     ],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+/* -------------------- DB -------------------- */
+try {
+  await connectMongo();
+  console.log("MongoDB connected");
+} catch (err) {
+  console.error("MongoDB connection failed:", err.message);
+  process.exit(1); // fail fast locally
+}
 
-// Connect DB once (safe for serverless)
-await connectMongo();
-
-// Register routes
+/* -------------------- ROUTES -------------------- */
 registerRoutes(app);
 
-// Central error handler
+/* -------------------- HEALTH CHECK -------------------- */
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "OK" });
+});
+
+/* -------------------- ERROR HANDLER -------------------- */
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(err.status || 500).json({
@@ -38,5 +49,17 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ✅ DO NOT listen on port (correct for Vercel)
+/* -------------------- LOCAL SERVER ONLY -------------------- */
+const PORT = process.env.PORT || 5000;
+
+// ✅ Run server locally only (Vercel sets VERCEL=1)
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
 export default app;
+
+
+
