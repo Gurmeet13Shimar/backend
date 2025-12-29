@@ -1,3 +1,4 @@
+
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { storage } from "./storage.js";
@@ -8,7 +9,6 @@ const ACCESS_TOKEN_SECRET =
 const REFRESH_TOKEN_SECRET =
   process.env.REFRESH_TOKEN_SECRET || "refresh-secret-key-replace-in-production";
 
-/* ================= AUTH MIDDLEWARE ================= */
 
 const authenticateToken = (req, res, next) => {
   try {
@@ -38,11 +38,13 @@ const authenticateToken = (req, res, next) => {
 /* ================= ROUTES ================= */
 
 export function registerRoutes(app) {
+
   /* ================= AUTH ================= */
 
   app.post("/api/auth/register", async (req, res) => {
     try {
       const { username, email, password } = req.body;
+
       if (!username || !email || !password) {
         return res.status(400).json({ message: "All fields are required" });
       }
@@ -56,6 +58,7 @@ export function registerRoutes(app) {
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
+
       const user = await storage.createUser({
         username,
         email,
@@ -88,10 +91,9 @@ export function registerRoutes(app) {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
+
       if (!username || !password) {
-        return res
-          .status(400)
-          .json({ message: "Username and password required" });
+        return res.status(400).json({ message: "Username and password required" });
       }
 
       const user = await storage.getUserByUsername(username);
@@ -211,9 +213,7 @@ export function registerRoutes(app) {
       }
 
       const summary = await summarizeStudentNotes(note.content);
-      res.json(
-        await storage.updateNote(req.body.noteId, { summary })
-      );
+      res.json(await storage.updateNote(req.body.noteId, { summary }));
     } catch (err) {
       console.error("Summarize note error:", err);
       res.status(500).json({ message: "Failed to summarize note" });
@@ -231,6 +231,54 @@ export function registerRoutes(app) {
     } catch (err) {
       console.error("Delete note error:", err);
       res.status(500).json({ message: "Failed to delete note" });
+    }
+  });
+
+  /* ================= JOURNALS ================= */
+
+  app.get("/api/journals", authenticateToken, async (req, res) => {
+    try {
+      res.json(await storage.getJournals(req.userId));
+    } catch (err) {
+      console.error("Get journals error:", err);
+      res.status(500).json({ message: "Failed to fetch journals" });
+    }
+  });
+
+  app.post("/api/journals", authenticateToken, async (req, res) => {
+    try {
+      const { content, mood, activities, date } = req.body;
+
+      if (!content || !mood) {
+        return res.status(400).json({ message: "Content and mood are required" });
+      }
+
+      const journal = await storage.createJournal({
+        userId: req.userId,
+        content,
+        mood,
+        activities: activities ?? null,
+        date: date ? new Date(date) : new Date(),
+      });
+
+      res.status(201).json(journal);
+    } catch (err) {
+      console.error("Create journal error:", err);
+      res.status(500).json({ message: "Failed to create journal" });
+    }
+  });
+
+  app.delete("/api/journals/:id", authenticateToken, async (req, res) => {
+    try {
+      const journal = await storage.getJournal(req.params.id);
+      if (!journal || journal.userId.toString() !== req.userId) {
+        return res.status(404).json({ message: "Journal not found" });
+      }
+      await storage.deleteJournal(req.params.id);
+      res.json({ message: "Journal deleted" });
+    } catch (err) {
+      console.error("Delete journal error:", err);
+      res.status(500).json({ message: "Failed to delete journal" });
     }
   });
 }
